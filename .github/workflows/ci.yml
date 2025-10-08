@@ -1,8 +1,6 @@
 name: CI
 
-on:
-  push:
-  pull_request:
+on: [push, pull_request]
 
 jobs:
   test-build:
@@ -14,38 +12,34 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install test tools
         run: |
           python -m pip install --upgrade pip
           pip install pytest
+          # optional, falls du psutil nutzt:
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       # Optionales Linting (bricht den Build NICHT ab)
       - name: Lint (optional)
         run: |
-          python - << 'PY'
-import py_compile, glob, sys
-files = glob.glob("**/*.py", recursive=True)
-bad = []
-for f in files:
-    try:
-        py_compile.compile(f, doraise=True)
-    except Exception as e:
-        bad.append((f, str(e)))
-if bad:
-    print("Lint-Warnungen (brechen den Build NICHT ab):")
-    for f, e in bad:
-        print("-", f, "->", e)
-PY
+          set +e
+          files=$(git ls-files '*.py' || true)
+          if [ -n "$files" ]; then
+            echo "Lint starte..."
+            for f in $files; do
+              python -m py_compile "$f" || echo "Lint-Warnung in $f"
+            done
+          else
+            echo "Keine .py Dateien gefunden."
+          fi
 
       - name: Run tests
         run: |
-          # Falls du "tests.py" aus der Anleitung nutzt:
           if [ -f tests.py ]; then
             python -m unittest tests.py -v
           else
-            # oder: pytest, falls du eigene Tests/Ordner hast
             pytest -q || true
           fi
 
@@ -61,4 +55,3 @@ PY
         with:
           name: sysinfo-mini
           path: dist/sysinfo-mini.tar.gz
-
